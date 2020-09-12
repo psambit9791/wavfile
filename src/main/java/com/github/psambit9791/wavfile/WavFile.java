@@ -12,75 +12,178 @@ package com.github.psambit9791.wavfile;
 
 import java.io.*;
 
-public class WavFile
-{
-    private enum IOState {READING, WRITING, CLOSED};
-    private final static int BUFFER_SIZE = 4096;
+/**
+ * Class for reading and writing WAV audio files.
+ * <p>
+ * Written by <a href="http://www.labbookpages.co.uk/">Andrew Greensted</a>.
+ */
+public final class WavFile {
 
-    private final static int FMT_CHUNK_ID = 0x20746D66;
-    private final static int DATA_CHUNK_ID = 0x61746164;
-    private final static int RIFF_CHUNK_ID = 0x46464952;
-    private final static int RIFF_TYPE_ID = 0x45564157;
+    /** Length in bytes of the WAV format header. */
+    private static final int WAVFILE_HEADER_LENGTH = 12;
 
-    private File file;						// File that will be read from or written to
-    private IOState ioState;				// Specifies the IO State of the Wav File (used for snaity checking)
-    private int bytesPerSample;			// Number of bytes required to store a single sample
-    private long numFrames;					// Number of frames within the data section
-    private FileOutputStream oStream;	// Output stream used for writting data
-    private FileInputStream iStream;		// Input stream used for reading data
-    private double floatScale;				// Scaling factor used for int <-> float conversion
-    private double floatOffset;			// Offset factor used for int <-> float conversion
-    private boolean wordAlignAdjust;		// Specify if an extra byte at the end of the data chunk is required for word alignment
+    /** Minimum number of WAV channels. */
+    private static final int MIN_CHANNELS = 1;
 
-    // Wav Header
-    private int numChannels;				// 2 bytes unsigned, 0x0001 (1) to 0xFFFF (65,535)
-    private long sampleRate;				// 4 bytes unsigned, 0x00000001 (1) to 0xFFFFFFFF (4,294,967,295)
-    // Although a java int is 4 bytes, it is signed, so need to use a long
-    private int blockAlign;					// 2 bytes unsigned, 0x0001 (1) to 0xFFFF (65,535)
-    private int validBits;					// 2 bytes unsigned, 0x0002 (2) to 0xFFFF (65,535)
+    /** Maximum number of WAV channels. */
+    private static final int MAX_CHANNELS = 65535;
 
-    // Buffering
-    private byte[] buffer;					// Local buffer used for IO
-    private int bufferPointer;				// Points to the current position in local buffer
-    private int bytesRead;					// Bytes read after last read into local buffer
-    private long frameCounter;				// Current number of frames read or written
+    /** Minimum number of valid bits. */
+    private static final int MIN_VALID_BITS = 2;
 
-    // Cannot instantiate WavFile directly, must either use newWavFile() or openWavFile()
-    private WavFile()
-    {
+    /** Maximum number of valid bits. */
+    private static final int MAX_VALID_BITS = 65535;
+
+    /** States that our IO operations can be in. */
+    private enum IOState {
+        /** Reading the buffer. */
+        READING,
+        /** Writing the buffer. */
+        WRITING,
+        /** Buffer is closed. */
+        CLOSED
+    };
+
+    /** Size of our internal buffer. */
+    private static final int BUFFER_SIZE = 4096;
+
+    /** WAV-specific constants. */
+    private static final int FMT_CHUNK_ID = 0x20746D66;
+
+    /** WAV-specific constants. */
+    private static final int DATA_CHUNK_ID = 0x61746164;
+
+    /** WAV-specific constants. */
+    private static final int RIFF_CHUNK_ID = 0x46464952;
+
+    /** WAV-specific constants. */
+    private static final int RIFF_TYPE_ID = 0x45564157;
+
+    /** Specifies the IO state of the WAV file. Used for sanity checking. */
+    private IOState ioState;
+
+    /** Number of bytes required to store a single sample. */
+    private int bytesPerSample;
+
+    /** Number of frames within the data section. */
+    private long numFrames;
+
+    /** Output stream used for writing data. */
+    private FileOutputStream oStream;
+
+    /** Input stream used for reading data. */
+    private FileInputStream iStream;
+
+    /** Scaling factor used for int to float conversion. */
+    private double floatScale;
+
+    /** Offset factor used for int to float conversion. */
+    private double floatOffset;
+
+    /** Specifies if an extra byte at the end of the data chunk is required for word alignment. */
+    private boolean wordAlignAdjust;
+
+    /*
+     * WAV header information.
+     */
+
+    /** 2 bytes unsigned: 0x0001 to 0xFFFF. */
+    private int numChannels;
+
+    /** 4 bytes unsigned. 0x00000001 (1) to 0xFFFFFFFF. Need a long since an int is signed. */
+    private long sampleRate;
+
+    /** 2 bytes unsigned: 0x0001 to 0xFFFF. */
+    private int blockAlign;
+
+    /** 2 bytes unsigned. 0x0002 to 0xFFFF. */
+    private int validBits;
+
+    /*
+     * Buffering.
+     */
+
+    /** Local IO buffer. */
+    private byte[] buffer;
+
+    /** Current buffer location. */
+    private int bufferPointer;
+
+    /** Number of bytes read. */
+    private int bytesRead;
+
+    /** Current number of frames read or written. */
+    private long frameCounter;
+
+    /**
+     * Cannot instantiate WavFile directly, must either use newWavFile() or openWavFile().
+     */
+    private WavFile() {
         buffer = new byte[BUFFER_SIZE];
     }
 
-    public int getNumChannels()
-    {
+    /**
+     * Gets the number of channels.
+     *
+     * @return the number of channels
+     */
+    public int getNumChannels() {
         return numChannels;
     }
 
-    public long getNumFrames()
-    {
+    /**
+     * Get the number of frames.
+     *
+     * @return the number of frames
+     */
+    public long getNumFrames() {
         return numFrames;
     }
 
-    public long getFramesRemaining()
-    {
+    /**
+     * Get the number of frames remaining.
+     *
+     * @return the number of frames remaining
+     */
+    public long getFramesRemaining() {
         return numFrames - frameCounter;
     }
 
-    public long getSampleRate()
-    {
+    /**
+     * Get the sample rate.
+     *
+     * @return the sample rate
+     */
+    public long getSampleRate() {
         return sampleRate;
     }
 
-    public int getValidBits()
-    {
+    /**
+     * Get the number of valid bits.
+     *
+     * @return the number of valid bits
+     */
+    public int getValidBits() {
         return validBits;
     }
 
-    public static WavFile newWavFile(File file, int numChannels, long numFrames, int validBits, long sampleRate) throws IOException, WavFileException
-    {
-        // Instantiate new Wavfile and initialise
+    /**
+     * Initialize a new WavFile object for writing into the specified file.
+     *
+     * @param file the file to write to
+     * @param numChannels the number of channels to use
+     * @param numFrames the number of frames to use
+     * @param validBits the number of alid bits to use
+     * @param sampleRate the sample rate for the new file
+     * @return the WavFile object
+     * @throws IOException Signals that an I/O exception has occurred
+     * @throws WavFileException a WavFile-specific exception
+     */
+    @SuppressWarnings("checkstyle:magicnumber")
+    public static WavFile newWavFile(final File file, final int numChannels, final long numFrames,
+                                     final int validBits, final long sampleRate) throws IOException, WavFileException {
+
         WavFile wavFile = new WavFile();
-        wavFile.file = file;
         wavFile.numChannels = numChannels;
         wavFile.numFrames = numFrames;
         wavFile.sampleRate = sampleRate;
@@ -88,80 +191,105 @@ public class WavFile
         wavFile.blockAlign = wavFile.bytesPerSample * numChannels;
         wavFile.validBits = validBits;
 
-        // Sanity check arguments
-        if (numChannels < 1 || numChannels > 65535) throw new WavFileException("Illegal number of channels, valid range 1 to 65536");
-        if (numFrames < 0) throw new WavFileException("Number of frames must be positive");
-        if (validBits < 2 || validBits > 65535) throw new WavFileException("Illegal number of valid bits, valid range 2 to 65536");
-        if (sampleRate < 0) throw new WavFileException("Sample rate must be positive");
+        /*
+         * Sanity check arguments
+         */
+        if (numChannels < MIN_CHANNELS || numChannels > MAX_CHANNELS) {
+            throw new WavFileException("Illegal number of channels, valid range 1 to 65536");
+        }
+        if (numFrames < 0) {
+            throw new WavFileException("Number of frames must be positive");
+        }
+        if (validBits < MIN_VALID_BITS || validBits > MAX_VALID_BITS) {
+            throw new WavFileException("Illegal number of valid bits, valid range 2 to 65536");
+        }
+        if (sampleRate < 0) {
+            throw new WavFileException("Sample rate must be positive");
+        }
 
-        // Create output stream for writing data
         wavFile.oStream = new FileOutputStream(file);
 
-        // Calculate the chunk sizes
+        /*
+         * Calculate chunk sizes.
+         */
         long dataChunkSize = wavFile.blockAlign * numFrames;
-        long mainChunkSize =	4 +	// Riff Type
-                8 +	// Format ID and size
-                16 +	// Format data
-                8 + 	// Data ID and size
+        long mainChunkSize = 4 + // Riff Type
+                8 + // Format ID and size
+                16 + // Format data
+                8 + // Data ID and size
                 dataChunkSize;
 
-        // Chunks must be word aligned, so if odd number of audio data bytes
-        // adjust the main chunk size
+        /*
+         * Chunks must be word aligned, so if odd number of audio data bytes adjust the main chunk
+         * size.
+         */
         if (dataChunkSize % 2 == 1) {
             mainChunkSize += 1;
             wavFile.wordAlignAdjust = true;
-        }
-        else {
+        } else {
             wavFile.wordAlignAdjust = false;
         }
 
-        // Set the main chunk size
-        putLE(RIFF_CHUNK_ID,	wavFile.buffer, 0, 4);
-        putLE(mainChunkSize,	wavFile.buffer, 4, 4);
-        putLE(RIFF_TYPE_ID,	wavFile.buffer, 8, 4);
+        /*
+         * Set the main chunk size.
+         */
+        putLE(RIFF_CHUNK_ID, wavFile.buffer, 0, 4);
+        putLE(mainChunkSize, wavFile.buffer, 4, 4);
+        putLE(RIFF_TYPE_ID, wavFile.buffer, 8, 4);
 
-        // Write out the header
+        /*
+         * Write the header.
+         */
         wavFile.oStream.write(wavFile.buffer, 0, 12);
 
-        // Put format data in buffer
+        /*
+         * Put format data into the buffer.
+         */
         long averageBytesPerSecond = sampleRate * wavFile.blockAlign;
 
-        putLE(FMT_CHUNK_ID,				wavFile.buffer, 0, 4);		// Chunk ID
-        putLE(16,							wavFile.buffer, 4, 4);		// Chunk Data Size
-        putLE(1,								wavFile.buffer, 8, 2);		// Compression Code (Uncompressed)
-        putLE(numChannels,				wavFile.buffer, 10, 2);		// Number of channels
-        putLE(sampleRate,					wavFile.buffer, 12, 4);		// Sample Rate
-        putLE(averageBytesPerSecond,	wavFile.buffer, 16, 4);		// Average Bytes Per Second
-        putLE(wavFile.blockAlign,		wavFile.buffer, 20, 2);		// Block Align
-        putLE(validBits,					wavFile.buffer, 22, 2);		// Valid Bits
+        putLE(FMT_CHUNK_ID, wavFile.buffer, 0, 4); // Chunk ID
+        putLE(16, wavFile.buffer, 4, 4); // Chunk Data Size
+        putLE(1, wavFile.buffer, 8, 2); // Compression Code (Uncompressed)
+        putLE(numChannels, wavFile.buffer, 10, 2); // Number of channels
+        putLE(sampleRate, wavFile.buffer, 12, 4); // Sample Rate
+        putLE(averageBytesPerSecond, wavFile.buffer, 16, 4); // Average Bytes Per Second
+        putLE(wavFile.blockAlign, wavFile.buffer, 20, 2); // Block Align
+        putLE(validBits, wavFile.buffer, 22, 2); // Valid Bits
 
-        // Write Format Chunk
+        /*
+         * Write Format Chunk
+         */
         wavFile.oStream.write(wavFile.buffer, 0, 24);
 
-        // Start Data Chunk
-        putLE(DATA_CHUNK_ID,				wavFile.buffer, 0, 4);		// Chunk ID
-        putLE(dataChunkSize,				wavFile.buffer, 4, 4);		// Chunk Data Size
+        /*
+         * Start Data Chunk
+         */
+        putLE(DATA_CHUNK_ID, wavFile.buffer, 0, 4); // Chunk ID
+        putLE(dataChunkSize, wavFile.buffer, 4, 4); // Chunk Data Size
 
-        // Write Format Chunk
+        /*
+         * Write Format Chunk
+         */
         wavFile.oStream.write(wavFile.buffer, 0, 8);
 
-        // Calculate the scaling factor for converting to a normalised double
-        if (wavFile.validBits > 8)
-        {
+        /*
+         * Calculate the scaling factor for normalized to a double.
+         */
+        if (wavFile.validBits > 8) {
             // If more than 8 validBits, data is signed
             // Conversion required multiplying by magnitude of max positive value
             wavFile.floatOffset = 0;
             wavFile.floatScale = Long.MAX_VALUE >> (64 - wavFile.validBits);
-        }
-        else
-        {
+        } else {
             // Else if 8 or less validBits, data is unsigned
             // Conversion required dividing by max positive value
             wavFile.floatOffset = 1;
             wavFile.floatScale = 0.5 * ((1 << wavFile.validBits) - 1);
         }
 
-        // Finally, set the IO State
+        /*
+         * Initialize our IO state.
+         */
         wavFile.bufferPointer = 0;
         wavFile.bytesRead = 0;
         wavFile.frameCounter = 0;
@@ -170,128 +298,211 @@ public class WavFile
         return wavFile;
     }
 
-    public static WavFile openWavFile(File file) throws IOException, WavFileException
-    {
-        // Instantiate new Wavfile and store the file reference
+    /**
+     * Read WAV contents from a provided file.
+     *
+     * @param file the file
+     * @return the wav file
+     * @throws IOException Signals that an I/O exception has occurred
+     * @throws WavFileException a WavFile-specific exception
+     */
+    @SuppressWarnings({"checkstyle:methodlength",
+            "checkstyle:magicnumber",
+            "checkstyle:avoidinlineconditionals"})
+    public static WavFile openWavFile(final File file) throws IOException, WavFileException {
+        /*
+         * Instantiate new Wavfile and store the file reference
+         */
         WavFile wavFile = new WavFile();
-        wavFile.file = file;
 
-        // Create a new file input stream for reading file data
+        /*
+         * Create a new file input stream for reading file data
+         */
         wavFile.iStream = new FileInputStream(file);
 
-        // Read the first 12 bytes of the file
-        int bytesRead = wavFile.iStream.read(wavFile.buffer, 0, 12);
-        if (bytesRead != 12) throw new WavFileException("Not enough wav file bytes for header");
+        /*
+         * Read the first 12 bytes of the file
+         */
+        int bytesRead = wavFile.iStream.read(wavFile.buffer, 0, WAVFILE_HEADER_LENGTH);
+        if (bytesRead != WAVFILE_HEADER_LENGTH) {
+            throw new WavFileException("Not enough wav file bytes for header");
+        }
 
-        // Extract parts from the header
+        /*
+         * Extract parts from the header
+         */
         long riffChunkID = getLE(wavFile.buffer, 0, 4);
         long chunkSize = getLE(wavFile.buffer, 4, 4);
         long riffTypeID = getLE(wavFile.buffer, 8, 4);
 
-        // Check the header bytes contains the correct signature
-        if (riffChunkID != RIFF_CHUNK_ID) throw new WavFileException("Invalid Wav Header data, incorrect riff chunk ID");
-        if (riffTypeID != RIFF_TYPE_ID) throw new WavFileException("Invalid Wav Header data, incorrect riff type ID");
+        /*
+         * Check the header bytes for the correct signature
+         */
+        if (riffChunkID != RIFF_CHUNK_ID) {
+            throw new WavFileException("Invalid Wav Header data, incorrect riff chunk ID");
+        }
+        if (riffTypeID != RIFF_TYPE_ID) {
+            throw new WavFileException("Invalid Wav Header data, incorrect riff type ID");
+        }
 
-        // Check that the file size matches the number of bytes listed in header
-        if (file.length() != chunkSize+8) {
-            throw new WavFileException("Header chunk size (" + chunkSize + ") does not match file size (" + file.length() + ")");
+        /*
+         * Check that the file size matches the number of bytes listed in header
+         */
+        if (file.length() < chunkSize + 8) {
+            throw new WavFileException("Header chunk size (" + chunkSize
+                    + ") does not match file size (" + file.length() + ")");
         }
 
         boolean foundFormat = false;
         boolean foundData = false;
 
-        // Search for the Format and Data Chunks
-        while (true)
-        {
-            // Read the first 8 bytes of the chunk (ID and chunk size)
+        /*
+         * Search for the Format and Data Chunks.
+         */
+        while (true) {
+            /*
+             * Read the first 8 bytes of the chunk (ID and chunk size)
+             */
             bytesRead = wavFile.iStream.read(wavFile.buffer, 0, 8);
-            if (bytesRead == -1) throw new WavFileException("Reached end of file without finding format chunk");
-            if (bytesRead != 8) throw new WavFileException("Could not read chunk header");
+            if (bytesRead == -1) {
+                throw new WavFileException("Reached end of file without finding format chunk");
+            }
+            if (bytesRead != 8) {
+                throw new WavFileException("Could not read chunk header");
+            }
 
-            // Extract the chunk ID and Size
+            /*
+             * Extract the chunk ID and Size
+             */
             long chunkID = getLE(wavFile.buffer, 0, 4);
             chunkSize = getLE(wavFile.buffer, 4, 4);
 
-            // Word align the chunk size
-            // chunkSize specifies the number of bytes holding data. However,
-            // the data should be word aligned (2 bytes) so we need to calculate
-            // the actual number of bytes in the chunk
-            long numChunkBytes = (chunkSize%2 == 1) ? chunkSize+1 : chunkSize;
+            /*
+             * Word align the chunk size chunkSize specifies the number of bytes holding data.
+             * However, the data should be word aligned (2 bytes) so we need to calculate the actual
+             * number of bytes in the chunk
+             */
+            long numChunkBytes = (chunkSize % 2 == 1) ? chunkSize + 1 : chunkSize;
 
-            if (chunkID == FMT_CHUNK_ID)
-            {
-                // Flag that the format chunk has been found
+            if (chunkID == FMT_CHUNK_ID) {
+                /*
+                 * Flag that the format chunk has been found
+                 */
                 foundFormat = true;
 
-                // Read in the header info
+                /*
+                 * Read in the header info
+                 */
                 bytesRead = wavFile.iStream.read(wavFile.buffer, 0, 16);
 
-                // Check this is uncompressed data
+                /*
+                 * Check this is uncompressed data
+                 */
                 int compressionCode = (int) getLE(wavFile.buffer, 0, 2);
-                if (compressionCode != 1) throw new WavFileException("Compression Code " + compressionCode + " not supported");
+                if (compressionCode != 1) {
+                    throw new WavFileException(
+                            "Compression Code " + compressionCode + " not supported");
+                }
 
-                // Extract the format information
+                /*
+                 * Extract the format information
+                 */
                 wavFile.numChannels = (int) getLE(wavFile.buffer, 2, 2);
                 wavFile.sampleRate = getLE(wavFile.buffer, 4, 4);
                 wavFile.blockAlign = (int) getLE(wavFile.buffer, 12, 2);
                 wavFile.validBits = (int) getLE(wavFile.buffer, 14, 2);
 
-                if (wavFile.numChannels == 0) throw new WavFileException("Number of channels specified in header is equal to zero");
-                if (wavFile.blockAlign == 0) throw new WavFileException("Block Align specified in header is equal to zero");
-                if (wavFile.validBits < 2) throw new WavFileException("Valid Bits specified in header is less than 2");
-                if (wavFile.validBits > 64) throw new WavFileException("Valid Bits specified in header is greater than 64, this is greater than a long can hold");
+                if (wavFile.numChannels == 0) {
+                    throw new WavFileException(
+                            "Number of channels specified in header is equal to zero");
+                }
+                if (wavFile.blockAlign == 0) {
+                    throw new WavFileException("Block Align specified in header is equal to zero");
+                }
+                if (wavFile.validBits < 2) {
+                    throw new WavFileException("Valid Bits specified in header is less than 2");
+                }
+                if (wavFile.validBits > 64) {
+                    throw new WavFileException(
+                            "Valid Bits specified in header is greater than 64, "
+                                    + "this is greater than a long can hold");
+                }
 
-                // Calculate the number of bytes required to hold 1 sample
+                /*
+                 * Calculate the number of bytes required to hold 1 sample
+                 */
                 wavFile.bytesPerSample = (wavFile.validBits + 7) / 8;
-                if (wavFile.bytesPerSample * wavFile.numChannels != wavFile.blockAlign)
-                    throw new WavFileException("Block Align does not agree with bytes required for validBits and number of channels");
+                if (wavFile.bytesPerSample * wavFile.numChannels != wavFile.blockAlign) {
+                    throw new WavFileException(
+                            "Block Align does not agree with bytes required "
+                                    + "for validBits and number of channels");
+                }
 
-                // Account for number of format bytes and then skip over
-                // any extra format bytes
+                /*
+                 * Account for number of format bytes and then skip over any extra format bytes.
+                 */
                 numChunkBytes -= 16;
-                if (numChunkBytes > 0) wavFile.iStream.skip(numChunkBytes);
-            }
-            else if (chunkID == DATA_CHUNK_ID)
-            {
-                // Check if we've found the format chunk,
-                // If not, throw an exception as we need the format information
-                // before we can read the data chunk
-                if (foundFormat == false) throw new WavFileException("Data chunk found before Format chunk");
+                if (numChunkBytes > 0) {
+                    wavFile.iStream.skip(numChunkBytes);
+                }
+            } else if (chunkID == DATA_CHUNK_ID) {
+                /*
+                 * Check if we've found the format chunk. If not, throw an exception as we need the
+                 * format information before we can read the data chunk
+                 */
+                if (foundFormat == false) {
+                    throw new WavFileException("Data chunk found before Format chunk");
+                }
 
-                // Check that the chunkSize (wav data length) is a multiple of the
-                // block align (bytes per frame)
-                if (chunkSize % wavFile.blockAlign != 0) throw new WavFileException("Data Chunk size is not multiple of Block Align");
+                /*
+                 * Check that the chunkSize (wav data length) is a multiple of the block align
+                 * (bytes per frame)
+                 */
+                if (chunkSize % wavFile.blockAlign != 0) {
+                    throw new WavFileException("Data Chunk size is not multiple of Block Align");
+                }
 
-                // Calculate the number of frames
+                /*
+                 * Calculate the number of frames
+                 */
                 wavFile.numFrames = chunkSize / wavFile.blockAlign;
 
-                // Flag that we've found the wave data chunk
+                /*
+                 * Flag that we've found the wave data chunk
+                 */
                 foundData = true;
 
                 break;
-            }
-            else
-            {
-                // If an unknown chunk ID is found, just skip over the chunk data
+            } else {
+                /*
+                 * If an unknown chunk ID is found, just skip over the chunk data.
+                 */
                 wavFile.iStream.skip(numChunkBytes);
             }
         }
 
-        // Throw an exception if no data chunk has been found
-        if (foundData == false) throw new WavFileException("Did not find a data chunk");
+        /*
+         * Throw an exception if no data chunk has been found.
+         */
+        if (foundData == false) {
+            throw new WavFileException("Did not find a data chunk");
+        }
 
-        // Calculate the scaling factor for converting to a normalised double
-        if (wavFile.validBits > 8)
-        {
-            // If more than 8 validBits, data is signed
-            // Conversion required dividing by magnitude of max negative value
+        /*
+         * Calculate the scaling factor for converting to a normalized double.
+         */
+        if (wavFile.validBits > 8) {
+            /*
+             * If more than 8 validBits, data is signed. Conversion required dividing by magnitude
+             * of max negative value.
+             */
             wavFile.floatOffset = 0;
             wavFile.floatScale = 1 << (wavFile.validBits - 1);
-        }
-        else
-        {
-            // Else if 8 or less validBits, data is unsigned
-            // Conversion required dividing by max positive value
+        } else {
+            /*
+             * Else if 8 or less validBits, data is unsigned. Conversion required dividing by max
+             * positive value.
+             */
             wavFile.floatOffset = -1;
             wavFile.floatScale = 0.5 * ((1 << wavFile.validBits) - 1);
         }
@@ -304,452 +515,687 @@ public class WavFile
         return wavFile;
     }
 
-    // Get and Put little endian data from local buffer
-    // ------------------------------------------------
-    private static long getLE(byte[] buffer, int pos, int numBytes)
-    {
-        numBytes --;
-        pos += numBytes;
-
-        long val = buffer[pos] & 0xFF;
-        for (int b=0 ; b<numBytes ; b++) val = (val << 8) + (buffer[--pos] & 0xFF);
-
-        return val;
+    /**
+     * Close the WavFile.
+     *
+     * @throws IOException Signals that an I/O exception has occurred
+     */
+    public void close() throws IOException {
+        if (iStream != null) {
+            iStream.close();
+            iStream = null;
+        }
+        if (oStream != null) {
+            if (bufferPointer > 0) {
+                oStream.write(buffer, 0, bufferPointer);
+            }
+            if (wordAlignAdjust) {
+                oStream.write(0);
+            }
+            oStream.close();
+            oStream = null;
+        }
+        ioState = IOState.CLOSED;
+    }
+    /**
+     * Get little-endian data from the buffer.
+     *
+     * @param buffer the buffer to read from
+     * @param position the starting position
+     * @param count the number of bytes to read
+     * @return a little-endian long
+     */
+    @SuppressWarnings("checkstyle:magicnumber")
+    private static long getLE(final byte[] buffer, final int position, final int count) {
+        int myCount = count - 1;
+        int myPosition = position + myCount;
+        long returnValue = buffer[myPosition] & 0xFF;
+        for (int b = 0; b < myCount; b++) {
+            returnValue = (returnValue << 8) + (buffer[--myPosition] & 0xFF);
+        }
+        return returnValue;
     }
 
-    private static void putLE(long val, byte[] buffer, int pos, int numBytes)
-    {
-        for (int b=0 ; b<numBytes ; b++)
-        {
-            buffer[pos] = (byte) (val & 0xFF);
-            val >>= 8;
-            pos ++;
+    /**
+     * Put little-endian data into the buffer.
+     *
+     * @param input the data to write into the buffer
+     * @param buffer the buffer to write to
+     * @param position the position to write to
+     * @param count the number of bytes to write
+     */
+    @SuppressWarnings({"checkstyle:magicnumber", "unused"})
+    private static void putLE(final long input, final byte[] buffer, final int position,
+                              final int count) {
+        long myInput = input;
+        int myPosition = position;
+        for (int b = 0; b < count; b++) {
+            buffer[myPosition] = (byte) (input & 0xFF);
+            myInput >>= 8;
+            myPosition++;
         }
     }
 
-    // Sample Writing and Reading
-    // --------------------------
-    private void writeSample(long val) throws IOException
-    {
-        for (int b=0 ; b<bytesPerSample ; b++)
-        {
-            if (bufferPointer == BUFFER_SIZE)
-            {
+    /**
+     * Write a sample to our buffer.
+     *
+     * @param sample the sample to write
+     * @throws IOException Signals that an I/O exception has occurred
+     */
+    @SuppressWarnings("checkstyle:magicnumber")
+    private void writeSample(final long sample) throws IOException {
+        long mySample = sample;
+        for (int b = 0; b < bytesPerSample; b++) {
+            if (bufferPointer == BUFFER_SIZE) {
                 oStream.write(buffer, 0, BUFFER_SIZE);
                 bufferPointer = 0;
             }
 
-            buffer[bufferPointer] = (byte) (val & 0xFF);
-            val >>= 8;
-            bufferPointer ++;
+            buffer[bufferPointer] = (byte) (mySample & 0xFF);
+            mySample >>= 8;
+            bufferPointer++;
         }
     }
 
-    private long readSample() throws IOException, WavFileException
-    {
+    /**
+     * Read a sample from the buffer.
+     *
+     * @return the sample read
+     * @throws IOException Signals that an I/O exception has occurred
+     * @throws WavFileException a WavFile-specific exception
+     */
+    @SuppressWarnings("checkstyle:magicnumber")
+    private long readSample() throws IOException, WavFileException {
         long val = 0;
 
-        for (int b=0 ; b<bytesPerSample ; b++)
-        {
-            if (bufferPointer == bytesRead)
-            {
+        for (int b = 0; b < bytesPerSample; b++) {
+            if (bufferPointer == bytesRead) {
                 int read = iStream.read(buffer, 0, BUFFER_SIZE);
-                if (read == -1) throw new WavFileException("Not enough data available");
+                if (read == -1) {
+                    throw new WavFileException("Not enough data available");
+                }
                 bytesRead = read;
                 bufferPointer = 0;
             }
 
             int v = buffer[bufferPointer];
-            if (b < bytesPerSample-1 || bytesPerSample == 1) v &= 0xFF;
+            if (b < bytesPerSample - 1 || bytesPerSample == 1) {
+                v &= 0xFF;
+            }
             val += v << (b * 8);
 
-            bufferPointer ++;
+            bufferPointer++;
         }
 
         return val;
     }
 
-    // Integer
-    // -------
-    public int readFrames(int[] sampleBuffer, int numFramesToRead) throws IOException, WavFileException
-    {
-        return readFrames(sampleBuffer, 0, numFramesToRead);
+    /**
+     * Read some number of frames from the buffer into a flat int array.
+     *
+     * @param returnBuffer the buffer to read samples into
+     * @param count the number of frames to read
+     * @return the number of frames read
+     * @throws IOException Signals that an I/O exception has occurred
+     * @throws WavFileException a WavFile-specific exception
+     */
+    public int readFrames(final int[] returnBuffer, final int count)
+            throws IOException, WavFileException {
+        return readFrames(returnBuffer, 0, count);
     }
 
-    public int readFrames(int[] sampleBuffer, int offset, int numFramesToRead) throws IOException, WavFileException
-    {
-        if (ioState != IOState.READING) throw new IOException("Cannot read from WavFile instance");
+    /**
+     * Read some number of frames from a specific offset in the buffer into a flat int array.
+     *
+     * @param returnBuffer the buffer to read samples into
+     * @param offset the buffer offset to read from
+     * @param count the number of frames to read
+     * @return the number of frames read
+     * @throws IOException Signals that an I/O exception has occurred
+     * @throws WavFileException a WavFile-specific exception
+     */
+    public int readFrames(final int[] returnBuffer, final int offset, final int count)
+            throws IOException, WavFileException {
+        int myOffset = offset;
+        if (ioState != IOState.READING) {
+            throw new IOException("Cannot read from WavFile instance");
+        }
 
-        for (int f=0 ; f<numFramesToRead ; f++)
-        {
-            if (frameCounter == numFrames) return f;
-
-            for (int c=0 ; c<numChannels ; c++)
-            {
-                sampleBuffer[offset] = (int) readSample();
-                offset ++;
+        for (int f = 0; f < count; f++) {
+            if (frameCounter == numFrames) {
+                return f;
             }
 
-            frameCounter ++;
-        }
-
-        return numFramesToRead;
-    }
-
-    public int readFrames(int[][] sampleBuffer, int numFramesToRead) throws IOException, WavFileException
-    {
-        return readFrames(sampleBuffer, 0, numFramesToRead);
-    }
-
-    public int readFrames(int[][] sampleBuffer, int offset, int numFramesToRead) throws IOException, WavFileException
-    {
-        if (ioState != IOState.READING) throw new IOException("Cannot read from WavFile instance");
-
-        for (int f=0 ; f<numFramesToRead ; f++)
-        {
-            if (frameCounter == numFrames) return f;
-
-            for (int c=0 ; c<numChannels ; c++) sampleBuffer[c][offset] = (int) readSample();
-
-            offset ++;
-            frameCounter ++;
-        }
-
-        return numFramesToRead;
-    }
-
-    public int writeFrames(int[] sampleBuffer, int numFramesToWrite) throws IOException, WavFileException
-    {
-        return writeFrames(sampleBuffer, 0, numFramesToWrite);
-    }
-
-    public int writeFrames(int[] sampleBuffer, int offset, int numFramesToWrite) throws IOException, WavFileException
-    {
-        if (ioState != IOState.WRITING) throw new IOException("Cannot write to WavFile instance");
-
-        for (int f=0 ; f<numFramesToWrite ; f++)
-        {
-            if (frameCounter == numFrames) return f;
-
-            for (int c=0 ; c<numChannels ; c++)
-            {
-                writeSample(sampleBuffer[offset]);
-                offset ++;
+            for (int c = 0; c < numChannels; c++) {
+                returnBuffer[myOffset] = (int) readSample();
+                myOffset++;
             }
 
-            frameCounter ++;
+            frameCounter++;
         }
 
-        return numFramesToWrite;
+        return count;
     }
 
-    public int writeFrames(int[][] sampleBuffer, int numFramesToWrite) throws IOException, WavFileException
-    {
-        return writeFrames(sampleBuffer, 0, numFramesToWrite);
+    /**
+     * Read some number of frames from the buffer into a multi-dimensional int array.
+     *
+     * @param returnBuffer the buffer to read samples into
+     * @param count the number of frames to read
+     * @return the number of frames read
+     * @throws IOException Signals that an I/O exception has occurred
+     * @throws WavFileException a WavFile-specific exception
+     */
+    public int readFrames(final int[][] returnBuffer, final int count)
+            throws IOException, WavFileException {
+        return readFrames(returnBuffer, 0, count);
     }
 
-    public int writeFrames(int[][] sampleBuffer, int offset, int numFramesToWrite) throws IOException, WavFileException
-    {
-        if (ioState != IOState.WRITING) throw new IOException("Cannot write to WavFile instance");
-
-        for (int f=0 ; f<numFramesToWrite ; f++)
-        {
-            if (frameCounter == numFrames) return f;
-
-            for (int c=0 ; c<numChannels ; c++) writeSample(sampleBuffer[c][offset]);
-
-            offset ++;
-            frameCounter ++;
+    /**
+     * Read some number of frames from a specific offset in the buffer into a multi-dimensional int
+     * array.
+     *
+     * @param returnBuffer the buffer to read samples into
+     * @param count the number of frames to read
+     * @param offset the buffer offset to read from
+     * @return the number of frames read
+     * @throws IOException Signals that an I/O exception has occurred
+     * @throws WavFileException a WavFile-specific exception
+     */
+    public int readFrames(final int[][] returnBuffer, final int offset, final int count)
+            throws IOException, WavFileException {
+        int myOffset = offset;
+        if (ioState != IOState.READING) {
+            throw new IOException("Cannot read from WavFile instance");
         }
 
-        return numFramesToWrite;
-    }
-
-    // Long
-    // ----
-    public int readFrames(long[] sampleBuffer, int numFramesToRead) throws IOException, WavFileException
-    {
-        return readFrames(sampleBuffer, 0, numFramesToRead);
-    }
-
-    public int readFrames(long[] sampleBuffer, int offset, int numFramesToRead) throws IOException, WavFileException
-    {
-        if (ioState != IOState.READING) throw new IOException("Cannot read from WavFile instance");
-
-        for (int f=0 ; f<numFramesToRead ; f++)
-        {
-            if (frameCounter == numFrames) return f;
-
-            for (int c=0 ; c<numChannels ; c++)
-            {
-                sampleBuffer[offset] = readSample();
-                offset ++;
+        for (int f = 0; f < count; f++) {
+            if (frameCounter == numFrames) {
+                return f;
             }
 
-            frameCounter ++;
-        }
-
-        return numFramesToRead;
-    }
-
-    public int readFrames(long[][] sampleBuffer, int numFramesToRead) throws IOException, WavFileException
-    {
-        return readFrames(sampleBuffer, 0, numFramesToRead);
-    }
-
-    public int readFrames(long[][] sampleBuffer, int offset, int numFramesToRead) throws IOException, WavFileException
-    {
-        if (ioState != IOState.READING) throw new IOException("Cannot read from WavFile instance");
-
-        for (int f=0 ; f<numFramesToRead ; f++)
-        {
-            if (frameCounter == numFrames) return f;
-
-            for (int c=0 ; c<numChannels ; c++) sampleBuffer[c][offset] = readSample();
-
-            offset ++;
-            frameCounter ++;
-        }
-
-        return numFramesToRead;
-    }
-
-    public int writeFrames(long[] sampleBuffer, int numFramesToWrite) throws IOException, WavFileException
-    {
-        return writeFrames(sampleBuffer, 0, numFramesToWrite);
-    }
-
-    public int writeFrames(long[] sampleBuffer, int offset, int numFramesToWrite) throws IOException, WavFileException
-    {
-        if (ioState != IOState.WRITING) throw new IOException("Cannot write to WavFile instance");
-
-        for (int f=0 ; f<numFramesToWrite ; f++)
-        {
-            if (frameCounter == numFrames) return f;
-
-            for (int c=0 ; c<numChannels ; c++)
-            {
-                writeSample(sampleBuffer[offset]);
-                offset ++;
+            for (int c = 0; c < numChannels; c++) {
+                returnBuffer[c][myOffset] = (int) readSample();
             }
 
-            frameCounter ++;
+            myOffset++;
+            frameCounter++;
         }
 
-        return numFramesToWrite;
+        return count;
+    }
+    /**
+     * Read some number of frames from the buffer into a flat long array.
+     *
+     * @param returnBuffer the buffer to read samples into
+     * @param count the number of frames to read
+     * @return the number of frames read
+     * @throws IOException Signals that an I/O exception has occurred
+     * @throws WavFileException a WavFile-specific exception
+     */
+    public int readFrames(final long[] returnBuffer, final int count)
+            throws IOException, WavFileException {
+        return readFrames(returnBuffer, 0, count);
     }
 
-    public int writeFrames(long[][] sampleBuffer, int numFramesToWrite) throws IOException, WavFileException
-    {
-        return writeFrames(sampleBuffer, 0, numFramesToWrite);
-    }
-
-    public int writeFrames(long[][] sampleBuffer, int offset, int numFramesToWrite) throws IOException, WavFileException
-    {
-        if (ioState != IOState.WRITING) throw new IOException("Cannot write to WavFile instance");
-
-        for (int f=0 ; f<numFramesToWrite ; f++)
-        {
-            if (frameCounter == numFrames) return f;
-
-            for (int c=0 ; c<numChannels ; c++) writeSample(sampleBuffer[c][offset]);
-
-            offset ++;
-            frameCounter ++;
+    /**
+     * Read some number of frames from a specific offset in the buffer into a flat long array.
+     *
+     * @param returnBuffer the buffer to read samples into
+     * @param offset the buffer offset to read from
+     * @param count the number of frames to read
+     * @return the number of frames read
+     * @throws IOException Signals that an I/O exception has occurred
+     * @throws WavFileException a WavFile-specific exception
+     */
+    public int readFrames(final long[] returnBuffer, final int offset, final int count)
+            throws IOException, WavFileException {
+        int myOffset = offset;
+        if (ioState != IOState.READING) {
+            throw new IOException("Cannot read from WavFile instance");
         }
 
-        return numFramesToWrite;
-    }
-
-    // Double
-    // ------
-    public int readFrames(double[] sampleBuffer, int numFramesToRead) throws IOException, WavFileException
-    {
-        return readFrames(sampleBuffer, 0, numFramesToRead);
-    }
-
-    public int readFrames(double[] sampleBuffer, int offset, int numFramesToRead) throws IOException, WavFileException
-    {
-        if (ioState != IOState.READING) throw new IOException("Cannot read from WavFile instance");
-
-        for (int f=0 ; f<numFramesToRead ; f++)
-        {
-            if (frameCounter == numFrames) return f;
-
-            for (int c=0 ; c<numChannels ; c++)
-            {
-                sampleBuffer[offset] = floatOffset + (double) readSample() / floatScale;
-                offset ++;
+        for (int f = 0; f < count; f++) {
+            if (frameCounter == numFrames) {
+                return f;
             }
 
-            frameCounter ++;
-        }
-
-        return numFramesToRead;
-    }
-
-    public int readFrames(double[][] sampleBuffer, int numFramesToRead) throws IOException, WavFileException
-    {
-        return readFrames(sampleBuffer, 0, numFramesToRead);
-    }
-
-    public int readFrames(double[][] sampleBuffer, int offset, int numFramesToRead) throws IOException, WavFileException
-    {
-        if (ioState != IOState.READING) throw new IOException("Cannot read from WavFile instance");
-
-        for (int f=0 ; f<numFramesToRead ; f++)
-        {
-            if (frameCounter == numFrames) return f;
-
-            for (int c=0 ; c<numChannels ; c++) sampleBuffer[c][offset] = floatOffset + (double) readSample() / floatScale;
-
-            offset ++;
-            frameCounter ++;
-        }
-
-        return numFramesToRead;
-    }
-
-    public int writeFrames(double[] sampleBuffer, int numFramesToWrite) throws IOException, WavFileException
-    {
-        return writeFrames(sampleBuffer, 0, numFramesToWrite);
-    }
-
-    public int writeFrames(double[] sampleBuffer, int offset, int numFramesToWrite) throws IOException, WavFileException
-    {
-        if (ioState != IOState.WRITING) throw new IOException("Cannot write to WavFile instance");
-
-        for (int f=0 ; f<numFramesToWrite ; f++)
-        {
-            if (frameCounter == numFrames) return f;
-
-            for (int c=0 ; c<numChannels ; c++)
-            {
-                writeSample((long) (floatScale * (floatOffset + sampleBuffer[offset])));
-                offset ++;
+            for (int c = 0; c < numChannels; c++) {
+                returnBuffer[myOffset] = readSample();
+                myOffset++;
             }
 
-            frameCounter ++;
+            frameCounter++;
         }
 
-        return numFramesToWrite;
+        return count;
     }
 
-    public int writeFrames(double[][] sampleBuffer, int numFramesToWrite) throws IOException, WavFileException
-    {
-        return writeFrames(sampleBuffer, 0, numFramesToWrite);
+    /**
+     * Read some number of frames from the buffer into a multi-dimensional long array.
+     *
+     * @param returnBuffer the buffer to read samples into
+     * @param count the number of frames to read
+     * @return the number of frames read
+     * @throws IOException Signals that an I/O exception has occurred
+     * @throws WavFileException a WavFile-specific exception
+     */
+    public int readFrames(final long[][] returnBuffer, final int count)
+            throws IOException, WavFileException {
+        return readFrames(returnBuffer, 0, count);
     }
 
-    public int writeFrames(double[][] sampleBuffer, int offset, int numFramesToWrite) throws IOException, WavFileException
-    {
-        if (ioState != IOState.WRITING) throw new IOException("Cannot write to WavFile instance");
-
-        for (int f=0 ; f<numFramesToWrite ; f++)
-        {
-            if (frameCounter == numFrames) return f;
-
-            for (int c=0 ; c<numChannels ; c++) writeSample((long) (floatScale * (floatOffset + sampleBuffer[c][offset])));
-
-            offset ++;
-            frameCounter ++;
+    /**
+     * Read some number of frames from a specific offset in the buffer into a multi-dimensional long
+     * array.
+     *
+     * @param returnBuffer the buffer to read samples into
+     * @param count the number of frames to read
+     * @param offset the buffer offset to read from
+     * @return the number of frames read
+     * @throws IOException Signals that an I/O exception has occurred
+     * @throws WavFileException a WavFile-specific exception
+     */
+    public int readFrames(final long[][] returnBuffer, final int offset, final int count)
+            throws IOException, WavFileException {
+        int myOffset = offset;
+        if (ioState != IOState.READING) {
+            throw new IOException("Cannot read from WavFile instance");
         }
 
-        return numFramesToWrite;
-    }
-
-
-    public void close() throws IOException
-    {
-        // Close the input stream and set to null
-        if (iStream != null)
-        {
-            iStream.close();
-            iStream = null;
-        }
-
-        if (oStream != null)
-        {
-            // Write out anything still in the local buffer
-            if (bufferPointer > 0) oStream.write(buffer, 0, bufferPointer);
-
-            // If an extra byte is required for word alignment, add it to the end
-            if (wordAlignAdjust) oStream.write(0);
-
-            // Close the stream and set to null
-            oStream.close();
-            oStream = null;
-        }
-
-        // Flag that the stream is closed
-        ioState = IOState.CLOSED;
-    }
-
-    public void display()
-    {
-        display(System.out);
-    }
-
-    public void display(PrintStream out)
-    {
-        out.printf("File: %s\n", file);
-        out.printf("Channels: %d, Frames: %d\n", numChannels, numFrames);
-        out.printf("IO State: %s\n", ioState);
-        out.printf("Sample Rate: %d, Block Align: %d\n", sampleRate, blockAlign);
-        out.printf("Valid Bits: %d, Bytes per sample: %d\n", validBits, bytesPerSample);
-    }
-
-    public static void main(String[] args)
-    {
-        if (args.length < 1)
-        {
-            System.err.println("Must supply filename");
-            System.exit(1);
-        }
-
-        try
-        {
-            for (String filename : args)
-            {
-                WavFile readWavFile = openWavFile(new File(filename));
-                readWavFile.display();
-
-                long numFrames = readWavFile.getNumFrames();
-                int numChannels = readWavFile.getNumChannels();
-                int validBits = readWavFile.getValidBits();
-                long sampleRate = readWavFile.getSampleRate();
-
-                WavFile writeWavFile = newWavFile(new File("out.wav"), numChannels, numFrames, validBits, sampleRate);
-
-                final int BUF_SIZE = 5001;
-
-//				int[] buffer = new int[BUF_SIZE * numChannels];
-//				long[] buffer = new long[BUF_SIZE * numChannels];
-                double[] buffer = new double[BUF_SIZE * numChannels];
-
-                int framesRead = 0;
-                int framesWritten = 0;
-
-                do
-                {
-                    framesRead = readWavFile.readFrames(buffer, BUF_SIZE);
-                    framesWritten = writeWavFile.writeFrames(buffer, BUF_SIZE);
-                    System.out.printf("%d %d\n", framesRead, framesWritten);
-                }
-                while (framesRead != 0);
-
-                readWavFile.close();
-                writeWavFile.close();
+        for (int f = 0; f < count; f++) {
+            if (frameCounter == numFrames) {
+                return f;
             }
 
-            WavFile writeWavFile = newWavFile(new File("out2.wav"), 1, 10, 23, 44100);
-            double[] buffer = new double[10];
-            writeWavFile.writeFrames(buffer, 10);
-            writeWavFile.close();
+            for (int c = 0; c < numChannels; c++) {
+                returnBuffer[c][myOffset] = readSample();
+            }
+
+            myOffset++;
+            frameCounter++;
         }
-        catch (Exception e)
-        {
-            System.err.println(e);
-            e.printStackTrace();
+
+        return count;
+    }
+    /**
+     * Read some number of frames from the buffer into a flat double array.
+     *
+     * @param returnBuffer the buffer to read samples into
+     * @param count the number of frames to read
+     * @return the number of frames read
+     * @throws IOException Signals that an I/O exception has occurred
+     * @throws WavFileException a WavFile-specific exception
+     */
+    public int readFrames(final double[] returnBuffer, final int count)
+            throws IOException, WavFileException {
+        return readFrames(returnBuffer, 0, count);
+    }
+
+    /**
+     * Read some number of frames from a specific offset in the buffer into a flat double array.
+     *
+     * @param returnBuffer the buffer to read samples into
+     * @param offset the buffer offset to read from
+     * @param count the number of frames to read
+     * @return the number of frames read
+     * @throws IOException Signals that an I/O exception has occurred
+     * @throws WavFileException a WavFile-specific exception
+     */
+    public int readFrames(final double[] returnBuffer, final int offset, final int count)
+            throws IOException, WavFileException {
+        int myOffset = offset;
+        if (ioState != IOState.READING) {
+            throw new IOException("Cannot read from WavFile instance");
         }
+
+        for (int f = 0; f < count; f++) {
+            if (frameCounter == numFrames) {
+                return f;
+            }
+
+            for (int c = 0; c < numChannels; c++) {
+                returnBuffer[myOffset] = floatOffset + (double) readSample() / floatScale;
+                myOffset++;
+            }
+
+            frameCounter++;
+        }
+
+        return count;
+    }
+
+    /**
+     * Read some number of frames from the buffer into a multi-dimensional double array.
+     *
+     * @param returnBuffer the buffer to read samples into
+     * @param count the number of frames to read
+     * @return the number of frames read
+     * @throws IOException Signals that an I/O exception has occurred
+     * @throws WavFileException a WavFile-specific exception
+     */
+    public int readFrames(final double[][] returnBuffer, final int count)
+            throws IOException, WavFileException {
+        return readFrames(returnBuffer, 0, count);
+    }
+
+    /**
+     * Read some number of frames from a specific offset in the buffer into a multi-dimensional
+     * double array.
+     *
+     * @param returnBuffer the buffer to read samples into
+     * @param count the number of frames to read
+     * @param offset the buffer offset to read from
+     * @return the number of frames read
+     * @throws IOException Signals that an I/O exception has occurred
+     * @throws WavFileException a WavFile-specific exception
+     */
+    public int readFrames(final double[][] returnBuffer, final int offset,
+                          final int count)
+            throws IOException, WavFileException {
+        int myOffset = offset;
+        if (ioState != IOState.READING) {
+            throw new IOException("Cannot read from WavFile instance");
+        }
+
+        for (int f = 0; f < count; f++) {
+            if (frameCounter == numFrames) {
+                return f;
+            }
+
+            for (int c = 0; c < numChannels; c++) {
+                returnBuffer[c][myOffset] = floatOffset + (double) readSample() / floatScale;
+            }
+
+            myOffset++;
+            frameCounter++;
+        }
+
+        return count;
+    }
+
+    /**
+     * Write some number of frames into the buffer from a flat int array.
+     *
+     * @param sampleBuffer the buffer to read samples from
+     * @param count the number of frames to write
+     * @return the number of frames written
+     * @throws IOException Signals that an I/O exception has occurred
+     * @throws WavFileException a WavFile-specific exception
+     */
+    public int writeFrames(final int[] sampleBuffer, final int count)
+            throws IOException, WavFileException {
+        return writeFrames(sampleBuffer, 0, count);
+    }
+
+    /**
+     * Write some number of frames into the buffer at a specific offset from a flat int array.
+     *
+     * @param sampleBuffer the buffer to read samples from
+     * @param count the number of frames to write
+     * @param offset the buffer offset to write into
+     * @return the number of frames written
+     * @throws IOException Signals that an I/O exception has occurred
+     * @throws WavFileException a WavFile-specific exception
+     */
+    public int writeFrames(final int[] sampleBuffer, final int offset, final int count)
+            throws IOException, WavFileException {
+        int myOffset = offset;
+        if (ioState != IOState.WRITING) {
+            throw new IOException("Cannot write to WavFile instance");
+        }
+
+        for (int f = 0; f < count; f++) {
+            if (frameCounter == numFrames) {
+                return f;
+            }
+
+            for (int c = 0; c < numChannels; c++) {
+                writeSample(sampleBuffer[myOffset]);
+                myOffset++;
+            }
+
+            frameCounter++;
+        }
+
+        return count;
+    }
+
+    /**
+     * Write some number of frames into the buffer from a multi-dimensional int array.
+     *
+     * @param sampleBuffer the buffer to read samples from
+     * @param count the number of frames to write
+     * @return the number of frames written
+     * @throws IOException Signals that an I/O exception has occurred
+     * @throws WavFileException a WavFile-specific exception
+     */
+    public int writeFrames(final int[][] sampleBuffer, final int count)
+            throws IOException, WavFileException {
+        return writeFrames(sampleBuffer, 0, count);
+    }
+
+    /**
+     * Write some number of frames into the buffer at a specific offset from a multi-dimensional int
+     * array.
+     *
+     * @param sampleBuffer the buffer to read samples from
+     * @param count the number of frames to write
+     * @param offset the buffer offset to write into
+     * @return the number of frames written
+     * @throws IOException Signals that an I/O exception has occurred
+     * @throws WavFileException a WavFile-specific exception
+     */
+    public int writeFrames(final int[][] sampleBuffer, final int offset, final int count)
+            throws IOException, WavFileException {
+        int myOffset = offset;
+        if (ioState != IOState.WRITING) {
+            throw new IOException("Cannot write to WavFile instance");
+        }
+
+        for (int f = 0; f < count; f++) {
+            if (frameCounter == numFrames) {
+                return f;
+            }
+
+            for (int c = 0; c < numChannels; c++) {
+                writeSample(sampleBuffer[c][myOffset]);
+            }
+
+            myOffset++;
+            frameCounter++;
+        }
+
+        return count;
+    }
+
+    /**
+     * Write some number of frames into the buffer from a flat long array.
+     *
+     * @param sampleBuffer the buffer to read samples from
+     * @param count the number of frames to write
+     * @return the number of frames written
+     * @throws IOException Signals that an I/O exception has occurred
+     * @throws WavFileException a WavFile-specific exception
+     */
+    public int writeFrames(final long[] sampleBuffer, final int count)
+            throws IOException, WavFileException {
+        return writeFrames(sampleBuffer, 0, count);
+    }
+
+    /**
+     * Write some number of frames into the buffer at a specific offset from a flat long array.
+     *
+     * @param sampleBuffer the buffer to read samples from
+     * @param count the number of frames to write
+     * @param offset the buffer offset to write into
+     * @return the number of frames written
+     * @throws IOException Signals that an I/O exception has occurred
+     * @throws WavFileException a WavFile-specific exception
+     */
+    public int writeFrames(final long[] sampleBuffer, final int offset, final int count)
+            throws IOException, WavFileException {
+        int myOffset = offset;
+        if (ioState != IOState.WRITING) {
+            throw new IOException("Cannot write to WavFile instance");
+        }
+
+        for (int f = 0; f < count; f++) {
+            if (frameCounter == numFrames) {
+                return f;
+            }
+
+            for (int c = 0; c < numChannels; c++) {
+                writeSample(sampleBuffer[myOffset]);
+                myOffset++;
+            }
+
+            frameCounter++;
+        }
+
+        return count;
+    }
+
+    /**
+     * Write some number of frames into the buffer from a multi-dimensional long array.
+     *
+     * @param sampleBuffer the buffer to read samples from
+     * @param count the number of frames to write
+     * @return the number of frames written
+     * @throws IOException Signals that an I/O exception has occurred
+     * @throws WavFileException a WavFile-specific exception
+     */
+    public int writeFrames(final long[][] sampleBuffer, final int count)
+            throws IOException, WavFileException {
+        return writeFrames(sampleBuffer, 0, count);
+    }
+
+    /**
+     * Write some number of frames into the buffer at a specific offset from a multi-dimensional
+     * long array.
+     *
+     * @param sampleBuffer the buffer to read samples from
+     * @param count the number of frames to write
+     * @param offset the buffer offset to write into
+     * @return the number of frames written
+     * @throws IOException Signals that an I/O exception has occurred
+     * @throws WavFileException a WavFile-specific exception
+     */
+    public int writeFrames(final long[][] sampleBuffer, final int offset, final int count)
+            throws IOException, WavFileException {
+        int myOffset = offset;
+        if (ioState != IOState.WRITING) {
+            throw new IOException("Cannot write to WavFile instance");
+        }
+
+        for (int f = 0; f < count; f++) {
+            if (frameCounter == numFrames) {
+                return f;
+            }
+
+            for (int c = 0; c < numChannels; c++) {
+                writeSample(sampleBuffer[c][myOffset]);
+            }
+
+            myOffset++;
+            frameCounter++;
+        }
+
+        return count;
+    }
+
+    /**
+     * Write some number of frames into the buffer from a flat double array.
+     *
+     * @param sampleBuffer the buffer to read samples from
+     * @param count the number of frames to write
+     * @return the number of frames written
+     * @throws IOException Signals that an I/O exception has occurred
+     * @throws WavFileException a WavFile-specific exception
+     */
+    public int writeFrames(final double[] sampleBuffer, final int count)
+            throws IOException, WavFileException {
+        return writeFrames(sampleBuffer, 0, count);
+    }
+
+    /**
+     * Write some number of frames into the buffer at a specific offset from a flat double array.
+     *
+     * @param sampleBuffer the buffer to read samples from
+     * @param count the number of frames to write
+     * @param offset the buffer offset to write into
+     * @return the number of frames written
+     * @throws IOException Signals that an I/O exception has occurred
+     * @throws WavFileException a WavFile-specific exception
+     */
+    public int writeFrames(final double[] sampleBuffer, final int offset, final int count)
+            throws IOException, WavFileException {
+        int myOffset = offset;
+        if (ioState != IOState.WRITING) {
+            throw new IOException("Cannot write to WavFile instance");
+        }
+
+        for (int f = 0; f < count; f++) {
+            if (frameCounter == numFrames) {
+                return f;
+            }
+
+            for (int c = 0; c < numChannels; c++) {
+                writeSample((long) (floatScale * (floatOffset + sampleBuffer[myOffset])));
+                myOffset++;
+            }
+
+            frameCounter++;
+        }
+
+        return count;
+    }
+
+    /**
+     * Write some number of frames into the buffer from a multi-dimensional double array.
+     *
+     * @param sampleBuffer the buffer to read samples from
+     * @param count the number of frames to write
+     * @return the number of frames written
+     * @throws IOException Signals that an I/O exception has occurred
+     * @throws WavFileException a WavFile-specific exception
+     */
+    public int writeFrames(final double[][] sampleBuffer, final int count)
+            throws IOException, WavFileException {
+        return writeFrames(sampleBuffer, 0, count);
+    }
+
+    /**
+     * Write some number of frames into the buffer at a specific offset from a multi-dimensional
+     * double array.
+     *
+     * @param sampleBuffer the buffer to read samples from
+     * @param count the number of frames to write
+     * @param offset the buffer offset to write into
+     * @return the number of frames written
+     * @throws IOException Signals that an I/O exception has occurred
+     * @throws WavFileException a WavFile-specific exception
+     */
+    public int writeFrames(final double[][] sampleBuffer, final int offset, final int count)
+            throws IOException, WavFileException {
+        int myOffset = offset;
+        if (ioState != IOState.WRITING) {
+            throw new IOException("Cannot write to WavFile instance");
+        }
+
+        for (int f = 0; f < count; f++) {
+            if (frameCounter == numFrames) {
+                return f;
+            }
+
+            for (int c = 0; c < numChannels; c++) {
+                writeSample((long) (floatScale * (floatOffset + sampleBuffer[c][myOffset])));
+            }
+
+            myOffset++;
+            frameCounter++;
+        }
+
+        return count;
     }
 }
