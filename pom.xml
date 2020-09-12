@@ -18,8 +18,9 @@
     </developers>
 
     <name>wavfile - Java Wav File IO</name>
-    <description>Written by Andrew Greensted. Available at </description>
-    <url>https://github.com/psambit9791/jDSP</url>
+    <description>Written by Andrew Greensted. Available at http://www.labbookpages.co.uk/audio/javaWavFiles.html.
+        This is just packaged to be made available through Maven. All source code belongs to Andrew Greensted.</description>
+    <url>https://github.com/psambit9791/wavfile</url>
 
     <dependencies>
         <dependency>
