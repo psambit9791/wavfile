@@ -138,6 +138,19 @@
         This is just packaged to be made available through Maven. All source code belongs to Andrew Greensted.</description>
     <url>https://github.com/psambit9791/wavfile</url>
 
+    <licenses>
+        <license>
+            <name>Apache License, Version 2.0</name>
+            <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+        </license>
+    </licenses>
+
+    <scm>
+        <connection>scm:git:git://github.com/psambit9791/wavfile.git</connection>
+        <developerConnection>scm:git:ssh://github.com:psambit9791/wavfile.git</developerConnection>
+        <url>http://github.com/psambit9791/wavfile/tree/master</url>
+    </scm>
+
     <dependencies>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
