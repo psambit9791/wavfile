@@ -303,7 +303,15 @@ public class WavFile {
         return WavFile.openInputStream(new FileInputStream(fileDescriptor));
     }
 
-    private static WavFile openInputStream(FileInputStream fileInputStream) throws WavFileException, IOException {
+    /**
+     * Read WAV contents from a provided fileInputStream.
+     *
+     * @param fileInputStream the fileInputStream
+     * @return the wav file
+     * @throws IOException      Signals that an I/O exception has occurred
+     * @throws WavFileException a WavFile-specific exception
+     */
+    public static WavFile openInputStream(FileInputStream fileInputStream) throws WavFileException, IOException {
         // Instantiate new Wavfile and store the file reference
         WavFile wavFile = new WavFile();
         wavFile.iStream = fileInputStream;
