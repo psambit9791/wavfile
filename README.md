@@ -21,3 +21,6 @@ implementation 'com.github.psambit9791:wavfile:0.1'
   <version>0.1</version>
 </dependency>
 ```
+
+### JitPack
+You can use **JitPack** to use the development version on your application; use this [link](https://jitpack.io/#psambit9791/wavfile/master-SNAPSHOT) for reference.
