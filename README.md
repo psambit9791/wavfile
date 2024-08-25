@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.com/psambit9791/wavfile.svg?branch=master)](https://travis-ci.com/psambit9791/wavfile)
+[![Build Status](https://github.com/psambit9791/wavfile/actions/workflows/maven.yml/badge.svg)](https://github.com/psambit9791/wavfile/actions/workflows/maven.yml)
 [![Maven Central](https://img.shields.io/maven-central/v/com.github.psambit9791/wavfile.svg?label=Maven%20Central)](https://search.maven.org/search?q=g:%22com.github.psambit9791%22%20AND%20a:%wavfile%22)
 [![javadoc](https://javadoc.io/badge2/com.github.psambit9791/wavfile/javadoc.svg)](https://javadoc.io/doc/com.github.psambit9791/wavfile)
 
