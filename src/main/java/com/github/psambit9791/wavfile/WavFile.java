@@ -22,6 +22,11 @@ package com.github.psambit9791.wavfile;
 
 import java.io.*;
 
+/**
+ * <h2>WAV File Processing</h2>
+ * Based on the libraries provided here: http://www.labbookpages.co.uk/audio/javaWavFiles.html#methods
+ * This simply acts as a wrapper on top of this to make the library more accessible.
+ */
 public class WavFile
 {
     /** States that our IO operations can be in. */
