@@ -10,7 +10,7 @@ To use this in your project, add this to your respective config file for Gradle 
 
 ### Gradle
 ```
-implementation 'com.github.psambit9791:wavfile:0.1'
+implementation 'com.github.psambit9791:wavfile:1.0.0'
 ```
 
 ### Maven
@@ -18,7 +18,7 @@ implementation 'com.github.psambit9791:wavfile:0.1'
 <dependency>
   <groupId>com.github.psambit9791</groupId>
   <artifactId>wavfile</artifactId>
-  <version>0.1</version>
+  <version>1.0.0</version>
 </dependency>
 ```
 
